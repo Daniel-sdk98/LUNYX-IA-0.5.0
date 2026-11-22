@@ -12,6 +12,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Descomprimir ZIP del proyecto (si el repo tiene un .zip)
+        run: |
+          ZIP=$(ls -t ./*.zip 2>/dev/null | head -1 || true)
+          if [ -n "$ZIP" ]; then
+            echo "Descomprimiendo $ZIP"
+            mkdir -p _src
+            unzip -q -o "$ZIP" -d _src
+          fi
+
+      - name: Localizar proyecto (package.json)
+        run: |
+          FILE=$(find . -name package.json -not -path '*/node_modules/*' -not -path './.git/*' | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)
+          if [ -z "$FILE" ]; then
+            echo "::error::No hay package.json en el repositorio. Sube el contenido del proyecto."
+            exit 1
+          fi
+          DIR=$(dirname "$FILE")
+          echo "Proyecto en: $DIR"
+          echo "APP_DIR=$DIR" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -22,19 +42,23 @@ jobs:
           java-version: 17
 
       - name: Instalar dependencias
+        working-directory: ${{ env.APP_DIR }}
         run: npm install --no-audit --no-fund
 
       - name: Typecheck
+        working-directory: ${{ env.APP_DIR }}
         run: npm run typecheck
 
       - name: Generar proyecto nativo Android
+        working-directory: ${{ env.APP_DIR }}
         run: npx expo prebuild --platform android --clean --no-install
 
       - name: Compilar APK release (arm64)
-        working-directory: android
+        working-directory: ${{ env.APP_DIR }}/android
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
 
       - name: Renombrar APK
+        working-directory: ${{ env.APP_DIR }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           cp android/app/build/outputs/apk/release/app-release.apk "Lunyx-AI-${VERSION}.apk"
@@ -42,4 +66,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Lunyx-AI-APK
-          path: Lunyx-AI-*.apk
+          path: ${{ env.APP_DIR }}/Lunyx-AI-*.apk
