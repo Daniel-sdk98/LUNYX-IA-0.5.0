@@ -45,6 +45,10 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npm install --no-audit --no-fund
 
+      - name: Declarar babel-preset-expo (faltaba en package.json)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm install --save-dev --no-audit --no-fund babel-preset-expo@~54.0.12
+
       - name: Typecheck
         working-directory: ${{ env.APP_DIR }}
         run: npm run typecheck
